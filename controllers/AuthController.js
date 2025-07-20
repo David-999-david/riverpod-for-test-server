@@ -1,4 +1,9 @@
-const { insertUser, registerUser, login } = require("../services/AuthService");
+const {
+  insertUser,
+  registerUser,
+  login,
+  verifyAndSendOtp,
+} = require("../services/AuthService");
 const ApiError = require("../utils/apiError");
 
 async function createUser(req, res, next) {
@@ -54,4 +59,24 @@ async function signIn(req, res, next) {
   }
 }
 
-module.exports = { createUser, signIn };
+async function sendOtp(req, res, next) {
+  const { email } = req.body;
+
+  if (!email) {
+    return next(new ApiError(400, "Email must not be empty!"));
+  }
+
+  try {
+    const message = await verifyAndSendOtp(email);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { createUser, signIn, sendOtp };

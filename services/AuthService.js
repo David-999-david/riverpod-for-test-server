@@ -4,6 +4,8 @@ const { accessEI, accessTk, refreshTk, refreshEI } = require("../config/jwt");
 const ApiError = require("../utils/apiError");
 const pool = require("../db");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 function generateAccess(userId, userRole) {
   return jwt.sign({ userId, purpose: "access", userRole }, accessTk, {
@@ -196,8 +198,84 @@ async function login(email, password) {
   }
 }
 
+async function verifyAndSendOtp(email) {
+  try {
+    const userRes = await pool.query(
+      `select id from users
+    where email =$1
+    `,
+      [email]
+    );
+
+    if (userRes.rows.length === 0) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const userId = userRes.rows[0].id;
+
+    // const otp = crypto.randomBytes(32).toString("hex");
+    const min = 100_000;
+    const max = 999_999;
+    const otp = crypto.randomInt(min, max);
+    const hashOtp = crypto
+      .createHash("sha256")
+      .update(otp.toString())
+      .digest("hex");
+
+    const otpEI = parseInt(process.env.OTP_EI, 10);
+
+    if (!otp || !hashOtp) {
+      throw new ApiError(500, "The opt or otp_hash is failed");
+    }
+
+    const otpRes = await pool.query(
+      `
+    insert into user_otp
+    (user_id,hash_otp,expires_at)
+    values
+    ($1,$2,now() + $3 * INTERVAL '1 second')
+    `,
+      [userId, hashOtp, otpEI]
+    );
+
+    if (otpRes.rowCount === 0) {
+      throw new ApiError(400, "Failed to insert otp data for user");
+    }
+
+    const emailTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    await emailTransporter.sendMail({
+      from: "没有油小墨水 <dontgun54@gmail.com>",
+      to: email,
+      subject: "Your password reset otp",
+      html: `
+      <html><body>
+    <p>Your password reset otp is</p>
+    <h1>${otp}</h1>
+    <p>Otp will expires in 10 minutes'</p>
+    </body></html>
+    `,
+    });
+
+    const message = `If ${email} is registered, Your mail will receive an otp later, please check you mail`;
+
+    return message;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
 module.exports = {
   registerUser,
   login,
   refreshBoth,
+  verifyAndSendOtp,
 };
