@@ -154,7 +154,7 @@ async function login(email, password) {
   try {
     const userRes = await pool.query(
       `
-    select password_hash,role from users
+    select id, password_hash,role from users
     where email =$1
     `,
       [email]
@@ -173,6 +173,8 @@ async function login(email, password) {
     }
 
     const userRole = userRes.rows[0].role;
+
+    const userId = userRes.rows[0].id;
 
     const access = generateAccess(userId, userRole);
 

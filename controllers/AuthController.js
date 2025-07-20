@@ -37,17 +37,21 @@ async function signIn(req, res, next) {
     return next(new ApiError(400, "Email or Password are required!"));
   }
 
-  const { message, access, refresh } = await login(email, password);
+  try {
+    const { message, access, refresh } = await login(email, password);
 
-  return res.status(200).json({
-    error: false,
-    success: true,
-    message,
-    data: {
-      access,
-      refresh,
-    },
-  });
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message,
+      data: {
+        access,
+        refresh,
+      },
+    });
+  } catch (e) {
+    return next(e);
+  }
 }
 
 module.exports = { createUser, signIn };
