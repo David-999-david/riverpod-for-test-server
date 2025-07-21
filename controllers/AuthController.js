@@ -4,6 +4,7 @@ const {
   login,
   verifyAndSendOtp,
   verifyOtpAndGenerateResetToken,
+  changeNewPsw,
 } = require("../services/AuthService");
 const ApiError = require("../utils/apiError");
 
@@ -104,4 +105,28 @@ async function verifyOtp(req, res, next) {
   }
 }
 
-module.exports = { createUser, signIn, sendOtp, verifyOtp };
+async function changePsw(req, res, next) {
+  const { resetToken, newPsw } = req.body;
+
+  if (!resetToken) {
+    return next(new ApiError(400, "Reset Token is missing"));
+  }
+
+  if (!newPsw) {
+    return next(new ApiError(400, "New Password is required"));
+  }
+
+  try {
+    const message = await changeNewPsw(resetToken, newPsw);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: message,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { createUser, signIn, sendOtp, verifyOtp, changePsw };

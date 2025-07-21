@@ -3,6 +3,7 @@ const {
   createUser,
   sendOtp,
   verifyOtp,
+  changePsw,
 } = require("../controllers/AuthController");
 const {
   otpCallLimit,
@@ -21,5 +22,7 @@ route.post("/login", signIn);
 route.post("/requestOtp", forgotPasswordLimit, sendOtp);
 
 route.post("/verifyOtp", otpCallLimit, verifyOtp);
+
+route.post("/changePsw", changePsw);
 
 module.exports = route;

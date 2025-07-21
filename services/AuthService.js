@@ -349,9 +349,43 @@ async function verifyOtpAndGenerateResetToken(otp, email) {
 
 async function changeNewPsw(resetToken, newPsw) {
   try {
+    let payload;
+    try {
+      payload = jwt.verify(resetToken, process.env.RESET_TK);
+    } catch (e) {
+      throw new ApiError(e.statusCode, e.message);
+    }
 
-    
+    const userId = payload.userId;
 
+    const newPswHash = await bcrypt.hash(newPsw, 10);
+
+    const { rows } = await pool.query(
+      `
+      update users
+      set password_hash =$1
+      where id=$2
+      returning id
+      `,
+      [newPswHash, userId]
+    );
+
+    if (rows.length === 0) {
+      throw new ApiError(500, "Change password Failed");
+    }
+
+    await pool.query(
+      `
+      update user_otp
+      set consumed = true
+      where user_id=$1
+      `,
+      [userId]
+    );
+
+    const message = "Password Reset successfully!";
+
+    return message;
   } catch (e) {
     throw new ApiError(e.statusCode, e.message);
   }
@@ -363,5 +397,5 @@ module.exports = {
   refreshBoth,
   verifyAndSendOtp,
   verifyOtpAndGenerateResetToken,
-  changeNewPsw
+  changeNewPsw,
 };

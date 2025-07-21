@@ -99,3 +99,9 @@
 [2m2025-07-21-11-27-09[22m [36mhttp[39m: POST /api/auth/requestOtp 429 70 - 2.024 ms
 [2m2025-07-21-11-27-30[22m [36mhttp[39m: POST /api/auth/requestOtp 200 139 - 2482.058 ms
 [2m2025-07-21-11-29-48[22m [36mhttp[39m: POST /api/auth/verifyOtp 200 262 - 54.505 ms
+[2m2025-07-21-13-35-34[22m [36mhttp[39m: POST /api/auth/requestOtp 200 139 - 3934.551 ms
+[2m2025-07-21-13-35-47[22m [36mhttp[39m: POST /api/auth/verifyOtp 200 262 - 48.208 ms
+[2m2025-07-21-13-40-57[22m [36mhttp[39m: POST /api/auth/requestOtp 200 139 - 3580.880 ms
+[2m2025-07-21-13-41-08[22m [36mhttp[39m: POST /api/auth/verifyOtp 200 262 - 39.677 ms
+[2m2025-07-21-13-41-55[22m [36mhttp[39m: POST /api/auth/changePsw 200 68 - 104.669 ms
+[2m2025-07-21-13-42-18[22m [36mhttp[39m: POST /api/auth/login 200 556 - 104.105 ms
