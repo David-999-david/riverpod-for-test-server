@@ -3,6 +3,7 @@ const {
   registerUser,
   login,
   verifyAndSendOtp,
+  verifyOtpAndGenerateResetToken,
 } = require("../services/AuthService");
 const ApiError = require("../utils/apiError");
 
@@ -79,4 +80,28 @@ async function sendOtp(req, res, next) {
   }
 }
 
-module.exports = { createUser, signIn, sendOtp };
+async function verifyOtp(req, res, next) {
+  const { otp, email } = req.body;
+
+  if (!otp) {
+    return next(new ApiError(400, "Otp is missing"));
+  }
+
+  if (!email) {
+    return next(new ApiError(400, "Email is missing"));
+  }
+
+  try {
+    const resetToken = await verifyOtpAndGenerateResetToken(otp, email);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      resetToken,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { createUser, signIn, sendOtp, verifyOtp };

@@ -233,7 +233,14 @@ async function verifyAndSendOtp(email) {
     insert into user_otp
     (user_id,hash_otp,expires_at)
     values
-    ($1,$2,now() + $3 * INTERVAL '1 second')
+    ($1,$2,now() + $3 * INTERVAL '1 minute')
+    on conflict (user_id)
+    do update set
+    hash_otp = excluded.hash_otp,
+    expires_at = excluded.expires_at,
+    consumed = false,
+    created_at = now()
+
     `,
       [userId, hashOtp, otpEI]
     );
@@ -273,9 +280,88 @@ async function verifyAndSendOtp(email) {
   }
 }
 
+async function verifyOtpAndGenerateResetToken(otp, email) {
+  try {
+    const userRes = await pool.query(
+      `
+    select id from users
+    where email=$1
+    `,
+      [email]
+    );
+
+    if (userRes.rowCount === 0) {
+      throw new ApiError(404, "User with email not found!");
+    }
+
+    const userId = userRes.rows[0].id;
+
+    const otpRes = await pool.query(
+      `
+    select id,hash_otp,expires_at from user_otp
+    where user_id=$1 and consumed = false
+    `,
+      [userId]
+    );
+
+    if (otpRes.rowCount === 0) {
+      throw new ApiError(404, "Otp not found user");
+    }
+
+    const { id: otpId, hash_otp: hashedOtp, expires_at: EA } = otpRes.rows[0];
+
+    if (EA < new Date()) {
+      throw new ApiError(400, "Otp is expired");
+    }
+
+    const incomintOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+    if (incomintOtp !== hashedOtp) {
+      throw new ApiError(400, "The input Otp Code is not match");
+    }
+
+    const resetTk = process.env.RESET_TK;
+
+    const expiresIn = parseInt(process.env.RESET_EI, 10);
+
+    const ResetToken = jwt.sign({ userId, purpose: "reset" }, resetTk, {
+      expiresIn: expiresIn,
+    });
+
+    if (!ResetToken) {
+      throw new ApiError(500, "Failed to generate reset token");
+    }
+
+    await pool.query(
+      `
+      update user_otp
+      set consumed = true
+      where id =$1
+      `,
+      [otpId]
+    );
+
+    return ResetToken;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+async function changeNewPsw(resetToken, newPsw) {
+  try {
+
+    
+
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
 module.exports = {
   registerUser,
   login,
   refreshBoth,
   verifyAndSendOtp,
+  verifyOtpAndGenerateResetToken,
+  changeNewPsw
 };
