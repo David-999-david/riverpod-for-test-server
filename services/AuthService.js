@@ -13,6 +13,7 @@ function generateAccess(userId, userRole) {
   });
 }
 
+
 async function generateRefresh(userId) {
   const refresh = jwt.sign(
     { userId, purpose: "refresh" },
