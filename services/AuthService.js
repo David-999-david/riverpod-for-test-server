@@ -81,8 +81,10 @@ async function refreshBoth(req, res, next) {
 
     const { rows } = await pool.query(
       `
-        select role from users 
-        where id =$1
+        select r.name as role
+        from user_roles as ur
+        left join roles as r on r.id = ur.role_id
+        where ur.user_id=$1
         `,
       [userId]
     );
@@ -132,7 +134,34 @@ async function registerUser(name, email, phone, password) {
     }
 
     const userId = rows[0].id;
-    const userRole = rows[0].role;
+
+    const rolesRes = await pool.query(
+      `
+      select id,name from roles
+      where name=$1
+      `,
+      ["user"]
+    );
+
+    if (rolesRes.rowCount === 0) {
+      throw new ApiError(500, "Failed to create role user");
+    }
+
+    const { id: userRoleId, name: userRole } = rolesRes.rows[0];
+
+    const result = await pool.query(
+      `
+      insert into user_roles
+      (user_id,role_id)
+      values
+      ($1,$2)
+      `,
+      [userId, userRoleId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new ApiError(500, "Faile to insert user_role table ");
+    }
 
     const access = generateAccess(userId, userRole);
 
@@ -156,7 +185,11 @@ async function login(email, password) {
   try {
     const userRes = await pool.query(
       `
-    select id, password_hash,role from users
+    select u.id, u.password_hash,
+    r.name as role
+    from users as u
+    join user_roles as ur on ur.user_id = u.id
+    join roles as r on r.id = ur.role_id
     where email =$1
     `,
       [email]
@@ -166,17 +199,17 @@ async function login(email, password) {
       throw new ApiError(404, "User not found!");
     }
 
-    const hashPsw = userRes.rows[0].password_hash;
+    const {
+      id: userId,
+      password_hash: hashPsw,
+      role: userRole,
+    } = userRes.rows[0];
 
     const compare = await bcrypt.compare(password, hashPsw);
 
     if (!compare) {
       throw new ApiError(400, "Password is incorrect!");
     }
-
-    const userRole = userRes.rows[0].role;
-
-    const userId = userRes.rows[0].id;
 
     const access = generateAccess(userId, userRole);
 

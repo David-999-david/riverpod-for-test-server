@@ -128,7 +128,44 @@ async function verifyAndUpgrade(userId, otp) {
       throw new ApiError(500, "Set otp consumed is failed");
     }
 
-    const access = generateAccess(userId, "Author");
+    const rolesRes = await pool.query(
+      `
+      select id,name
+      from roles
+      where name=$1
+      `,
+      ["author"]
+    );
+
+    if (rolesRes.rowCount === 0) {
+      throw new ApiError(500, "Author role is not found in database");
+    }
+
+    const { id: roleId, name: userRole } = rolesRes.rows[0];
+
+    const linkRes = await pool.query(
+      `
+      insert into user_roles
+      (user_id,role_id)
+      values
+      ($1,$2)
+      on conflict (user_id)
+      do update set
+      role_id = excluded.role_id,
+      updated_at = now()
+      
+      `,
+      [userId, roleId]
+    );
+
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(
+        500,
+        "Upgrade user role id in user_role table database is failed"
+      );
+    }
+
+    const access = generateAccess(userId, userRole);
 
     const refresh = await generateRefresh(userId);
 
@@ -138,19 +175,6 @@ async function verifyAndUpgrade(userId, otp) {
 
     if (!refresh) {
       throw new ApiError(500, "Generate refresh token for Author is failed");
-    }
-
-    const userRes = await pool.query(
-      `
-      update users
-      set role = 'Author'
-      where id = $1
-      `,
-      [userId]
-    );
-
-    if (userRes.rowCount === 0) {
-      throw new ApiError(500, "Upgrade user to Author is Failed");
     }
 
     const refreshRes = await pool.query(
