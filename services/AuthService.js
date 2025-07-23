@@ -13,7 +13,6 @@ function generateAccess(userId, userRole) {
   });
 }
 
-
 async function generateRefresh(userId) {
   const refresh = jwt.sign(
     { userId, purpose: "refresh" },
@@ -399,4 +398,6 @@ module.exports = {
   verifyAndSendOtp,
   verifyOtpAndGenerateResetToken,
   changeNewPsw,
+  generateAccess,
+  generateRefresh,
 };

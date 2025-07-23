@@ -1,8 +1,9 @@
-const { authorSecret } = require("../config/jwt");
+const { authorSecret, refreshEI } = require("../config/jwt");
 const pool = require("../db");
 const ApiError = require("../utils/apiError");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const { generateAccess, generateRefresh } = require("./AuthService");
 
 async function checkSecret(secret_key, userId) {
   if (secret_key != authorSecret) {
@@ -32,7 +33,8 @@ async function checkSecret(secret_key, userId) {
         on conflict (user_id)
         do update set
         hash_otp = excluded.hash_otp,
-        expires_at=excluded.expires_at
+        expires_at=excluded.expires_at,
+        consumed = false
         `,
       [userId, otpHash, otpEi]
     );
@@ -84,4 +86,94 @@ async function checkSecret(secret_key, userId) {
   }
 }
 
-module.exports = { checkSecret };
+async function verifyAndUpgrade(userId, otp) {
+  try {
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp.toString())
+      .digest("hex");
+
+    const otpRes = await pool.query(
+      `
+        select hash_otp, expires_at from user_otp
+        where user_id = $1 and consumed = false
+        `,
+      [userId]
+    );
+
+    if (otpRes.rowCount === 0) {
+      throw new ApiError(404, "User otp not found in database");
+    }
+
+    const { hash_otp: databaseHashOtp, expires_at: Ea } = otpRes.rows[0];
+
+    if (Ea < new Date()) {
+      throw new ApiError(500, "Otp is expired");
+    }
+
+    if (hashedOtp != databaseHashOtp) {
+      throw new ApiError(404, "Otp is incorrect");
+    }
+
+    const result = await pool.query(
+      `
+      update user_otp
+      set consumed = true
+      where user_id =$1
+      `,
+      [userId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new ApiError(500, "Set otp consumed is failed");
+    }
+
+    const access = generateAccess(userId, "Author");
+
+    const refresh = await generateRefresh(userId);
+
+    if (!access) {
+      throw new ApiError(500, "Generate access token for Author is failed");
+    }
+
+    if (!refresh) {
+      throw new ApiError(500, "Generate refresh token for Author is failed");
+    }
+
+    const userRes = await pool.query(
+      `
+      update users
+      set role = 'Author'
+      where id = $1
+      `,
+      [userId]
+    );
+
+    if (userRes.rowCount === 0) {
+      throw new ApiError(500, "Upgrade user to Author is Failed");
+    }
+
+    const refreshRes = await pool.query(
+      `
+      update user_refresh_token
+      set
+      refresh_token = $1,
+      expires_in = now() + $2 * interval '1 minute'
+      where userid=$3
+      `,
+      [refresh, refreshEI, userId]
+    );
+
+    if (refreshRes.rowCount === 0) {
+      throw new ApiError(500, "Update refresh Failed");
+    }
+
+    const message = "Successfully upgrade to Author";
+
+    return { access, refresh, message };
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = { checkSecret, verifyAndUpgrade };
