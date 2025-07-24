@@ -1,9 +1,9 @@
-const { authorSecret, refreshEI } = require("../config/jwt");
-const pool = require("../db");
-const ApiError = require("../utils/apiError");
+const { authorSecret, refreshEI } = require("../../config/jwt");
+const pool = require("../../db");
+const ApiError = require("../../utils/apiError");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const { generateAccess, generateRefresh } = require("./AuthService");
+const { generateAccess, generateRefresh } = require("../AuthService");
 
 async function checkSecret(secret_key, userId) {
   if (secret_key != authorSecret) {
@@ -217,4 +217,158 @@ async function verifyAndUpgrade(userId, otp) {
   }
 }
 
-module.exports = { checkSecret, verifyAndUpgrade };
+async function insertBook(userId, category, subCategory, name, description) {
+  try {
+    let categoryRes = await pool.query(
+      `
+      insert into category
+      (name)
+      values
+      ($1)
+      on conflict (name)
+      do nothing
+      returning *
+      `,
+      [category]
+    );
+
+    if (categoryRes.rowCount === 0) {
+      categoryRes = await pool.query(
+        `
+        select id,name from category where name=$1
+        `,
+        [category]
+      );
+    }
+
+    const { id: categoryId, name: categoryName } = categoryRes.rows[0];
+
+    let subCateRes = await pool.query(
+      `
+      insert into sub_category
+      (name,category_id)
+      values
+      ($1,$2)
+      on conflict (name,category_id) do nothing
+      returning *
+      `,
+      [subCategory, categoryId]
+    );
+
+    if (subCateRes.rowCount === 0) {
+      subCateRes = await pool.query(
+        `
+        select id,name from sub_category
+        where name =$1 and category_id=$2
+        `,
+        [subCategory, categoryId]
+      );
+    }
+
+    const { id: subCateId, name: subCateName } = subCateRes.rows[0];
+
+    const bookRes = await pool.query(
+      `
+      insert into book
+      (name,description)
+      values
+      ($1,$2)
+      returning *
+      `,
+      [name, description]
+    );
+
+    if (bookRes.rowCount === 0) {
+      throw new ApiError(500, "Failed to create a book");
+    }
+
+    const bookId = bookRes.rows[0].id;
+
+    const bookSubLink = await pool.query(
+      `insert into book_sub_category
+      (book_id,sub_category_id)
+      values
+      ($1,$2)
+      `,
+      [bookId, subCateId]
+    );
+
+    if (bookSubLink.rowCount === 0) {
+      throw new ApiError(
+        500,
+        "Failed to make a link realtion between book with subcategory"
+      );
+    }
+
+    const bookAuthorLink = await pool.query(
+      `
+      insert into author_book
+      (author_id,book_id)
+      values
+      ($1,$2)
+      `,
+      [userId, bookId]
+    );
+
+    if (bookAuthorLink.rowCount === 0) {
+      throw new ApiError(
+        500,
+        "Failed to make link realtion between author with book"
+      );
+    }
+
+    const book = bookRes.rows[0];
+
+    const userRes = await pool.query(
+      `
+      select name from users
+      where id = $1
+      `,
+      [userId]
+    );
+
+    if (userRes.rowCount === 0) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const { name: authorName } = userRes.rows[0];
+
+    return { categoryName, subCateName, authorName, book };
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+async function getAllBooks(authorId) {
+  try {
+    const linkRes = await pool.query(
+      `
+    select
+    c.name as "category",
+    b.id as "bookId",
+    b.name as "bookName",
+    b.description as "bookDesc",
+    u.name as "authorName",
+    sc.name as "subCategory"
+    from author_book as ab
+    join users as u on u.id = ab.author_id
+    join book as b on b.id = ab.book_id
+    join book_sub_category as bs on bs.book_id = b.id
+    join sub_category as sc on sc.id = bs.sub_category_id
+    join category as c on c.id = sc.category_id
+    where author_id =$1
+    `,
+      [authorId]
+    );
+
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(500, "Can't find the book data about for author");
+    }
+
+    return linkRes.rows;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = { checkSecret, verifyAndUpgrade, insertBook, getAllBooks };
