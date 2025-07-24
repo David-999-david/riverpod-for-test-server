@@ -236,3 +236,14 @@
 [2m2025-07-23-15-55-16[22m [36mhttp[39m: POST /api/author/sendOtp 200 70 - 2867.315 ms
 [2m2025-07-23-15-55-29[22m [36mhttp[39m: POST /api/author/verifyOtp 200 570 - 48.508 ms
 [2m2025-07-23-15-55-30[22m [36mhttp[39m: GET /api/user/info 200 84 - 2.056 ms
+[2m2025-07-24-08-11-16[22m [36mhttp[39m: POST /api/auth/register 201 599 - 129.916 ms
+[2m2025-07-24-08-11-27[22m [36mhttp[39m: GET /api/user/info 200 89 - 39.057 ms
+[2m2025-07-24-08-14-06[22m [36mhttp[39m: POST /api/auth/register 201 599 - 163.567 ms
+[2m2025-07-24-08-30-44[22m [36mhttp[39m: POST /api/auth/refresh 500 82 - 60.194 ms
+[2m2025-07-24-08-50-12[22m [36mhttp[39m: POST /api/auth/login 200 594 - 120.724 ms
+[2m2025-07-24-08-50-16[22m [36mhttp[39m: GET /api/user/info 200 84 - 3.669 ms
+[2m2025-07-24-08-58-39[22m [36mhttp[39m: POST /api/auth/refresh 201 568 - 60.463 ms
+[2m2025-07-24-08-58-43[22m [36mhttp[39m: GET /api/user/info 200 84 - 2.837 ms
+[2m2025-07-24-08-58-53[22m [36mhttp[39m: POST /api/author/sendOtp 200 70 - 2713.709 ms
+[2m2025-07-24-08-59-31[22m [36mhttp[39m: POST /api/author/verifyOtp 200 663 - 52.329 ms
+[2m2025-07-24-08-59-31[22m [36mhttp[39m: GET /api/user/info 200 84 - 2.370 ms

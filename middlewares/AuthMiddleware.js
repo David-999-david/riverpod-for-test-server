@@ -24,6 +24,7 @@ async function CheckAuth(req, res, next) {
 
     req.userId = payload.userId;
     req.userRole = payload.userRole;
+    req.userPerms = payload.permissions;
     return next();
   } catch (e) {
     if (e.name === "TokenExpiredError") {

@@ -165,7 +165,24 @@ async function verifyAndUpgrade(userId, otp) {
       );
     }
 
-    const access = generateAccess(userId, userRole);
+    const permRows = await pool.query(
+      `
+      select p.name as permission
+      from roles as r
+      join role_permissions as rp on rp.role_id = r.id
+      join permissions as p on p.id = rp.permission_id
+      where r.id = $1
+      `,
+      [roleId]
+    );
+
+    if (permRows.rowCount === 0) {
+      throw new ApiError(500, "Failed to upgrade the permissions for author");
+    }
+
+    const permissions = permRows.rows.map((p) => p.permission);
+
+    const access = generateAccess(userId, userRole, permissions);
 
     const refresh = await generateRefresh(userId);
 

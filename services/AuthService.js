@@ -7,10 +7,14 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-function generateAccess(userId, userRole) {
-  return jwt.sign({ userId, purpose: "access", userRole }, accessTk, {
-    expiresIn: accessEI,
-  });
+function generateAccess(userId, userRole, permissions) {
+  return jwt.sign(
+    { userId, purpose: "access", userRole, permissions },
+    accessTk,
+    {
+      expiresIn: accessEI,
+    }
+  );
 }
 
 async function generateRefresh(userId) {
@@ -79,23 +83,29 @@ async function refreshBoth(req, res, next) {
       [userId, refreshTok]
     );
 
-    const { rows } = await pool.query(
+    const permRows = await pool.query(
       `
-        select r.name as role
+        select 
+        r.name as role,
+        p.name as permission
         from user_roles as ur
-        left join roles as r on r.id = ur.role_id
+        join roles as r on r.id = ur.role_id
+        join role_permissions as rp on rp.role_id = r.id
+        join permissions as p on p.id = rp.permission_id
         where ur.user_id=$1
         `,
       [userId]
     );
 
-    if (rows.length === 0) {
+    if (permRows.rowCount === 0) {
       return next(new ApiError(401, "User not found!"));
     }
 
-    const userRole = rows[0].role;
+    const userRole = permRows.rows[0].role;
 
-    const newAccess = generateAccess(userId, userRole);
+    const userPerms = permRows.rows.map((p) => p.permission);
+
+    const newAccess = generateAccess(userId, userRole, userPerms);
 
     const newRefresh = await generateRefresh(userId);
 
@@ -113,67 +123,79 @@ async function refreshBoth(req, res, next) {
 }
 
 async function registerUser(name, email, phone, password) {
-  const userPhone = phone ? phone : null;
-
-  const hashedPsw = await bcrypt.hash(password, 10);
-
   try {
-    const { rows } = await pool.query(
+    const hashedPsw = await bcrypt.hash(password, 10);
+
+    const incomingPhone = phone ? phone : null;
+
+    const userRes = await pool.query(
       `
-        insert into users
-        (name,email,phone,password_hash)
-        values
-        ($1,$2,$3,$4)
-        returning *
-        `,
-      [name, email, userPhone, hashedPsw]
+      insert into users
+      (name,email,phone,password_hash)
+      values
+      ($1,$2,$3,$4)
+      returning id
+      `,
+      [name, email, incomingPhone, hashedPsw]
     );
 
-    if (rows.length === 0) {
-      throw new ApiError(500, "Failed to create new user");
+    if (userRes.rowCount === 0) {
+      throw new ApiError(500, "Failed to insert new user");
     }
 
-    const userId = rows[0].id;
+    const userId = userRes.rows[0].id;
 
-    const rolesRes = await pool.query(
+    const roleRes = await pool.query(
       `
       select id,name from roles
-      where name=$1
+      where name = $1
       `,
       ["user"]
     );
 
-    if (rolesRes.rowCount === 0) {
-      throw new ApiError(500, "Failed to create role user");
+    if (roleRes.rowCount === 0) {
+      throw new ApiError(500, "Can't find the role about user");
     }
 
-    const { id: userRoleId, name: userRole } = rolesRes.rows[0];
+    const { id: roleId, name: userRole } = roleRes.rows[0];
 
-    const result = await pool.query(
+    const linkRes = await pool.query(
       `
       insert into user_roles
       (user_id,role_id)
       values
       ($1,$2)
       `,
-      [userId, userRoleId]
+      [userId, roleId]
     );
 
-    if (result.rowCount === 0) {
-      throw new ApiError(500, "Faile to insert user_role table ");
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(
+        500,
+        "Failed to connect insert for new user with user role"
+      );
     }
 
-    const access = generateAccess(userId, userRole);
+    const { rows: perRows } = await pool.query(
+      `
+      select p.name
+      from permissions as p
+      join role_permissions as rp on rp.permission_id = p.id
+      join user_roles as ur on ur.role_id = rp.role_id
+      where ur.user_id =$1
+      `,
+      [userId]
+    );
+
+    if (perRows.length === 0) {
+      throw new ApiError(500, "Current user have nothing permissions");
+    }
+
+    const permissions = perRows.map((r) => r.name);
+
+    const access = generateAccess(userId, userRole, permissions);
 
     const refresh = await generateRefresh(userId);
-
-    if (!access) {
-      throw new ApiError(500, "Jwt Error when generate access token");
-    }
-
-    if (!refresh) {
-      throw new ApiError(500, "Jwt Error when generate refresh token");
-    }
 
     return { access, refresh };
   } catch (e) {
@@ -185,11 +207,8 @@ async function login(email, password) {
   try {
     const userRes = await pool.query(
       `
-    select u.id, u.password_hash,
-    r.name as role
-    from users as u
-    join user_roles as ur on ur.user_id = u.id
-    join roles as r on r.id = ur.role_id
+    select id,password_hash
+    from users
     where email =$1
     `,
       [email]
@@ -199,11 +218,7 @@ async function login(email, password) {
       throw new ApiError(404, "User not found!");
     }
 
-    const {
-      id: userId,
-      password_hash: hashPsw,
-      role: userRole,
-    } = userRes.rows[0];
+    const { id: userId, password_hash: hashPsw } = userRes.rows[0];
 
     const compare = await bcrypt.compare(password, hashPsw);
 
@@ -211,7 +226,32 @@ async function login(email, password) {
       throw new ApiError(400, "Password is incorrect!");
     }
 
-    const access = generateAccess(userId, userRole);
+    const permRows = await pool.query(
+      `
+      select 
+      r.name as role,
+      p.name as permission
+      from user_roles as ur
+      join roles as r on r.id = ur.role_id
+      join role_permissions as rp on rp.role_id = r.id
+      join permissions as p on p.id = rp.permission_id
+      where ur.user_id =$1
+      `,
+      [userId]
+    );
+
+    if (permRows.rowCount === 0) {
+      throw new ApiError(
+        500,
+        "Cant find the role and permission for this user"
+      );
+    }
+
+    const userRole = permRows.rows[0].role;
+
+    const permissions = permRows.rows.map((p) => p.permission);
+
+    const access = generateAccess(userId, userRole, permissions);
 
     const refresh = await generateRefresh(userId);
 
