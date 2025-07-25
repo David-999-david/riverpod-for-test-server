@@ -31,4 +31,39 @@ async function userInfo(userId) {
   }
 }
 
-module.exports = { userInfo };
+async function getAllAuthor() {
+  try {
+    const roleRes = await pool.query(
+      `
+      select id from roles
+      where name = $1
+      `,
+      ["author"]
+    );
+
+    if (roleRes.rowCount === 0) {
+      throw new ApiError(500, "Can't find the Role_id of author role");
+    }
+
+    const roleId = roleRes.rows[0].id;
+
+    const authorRes = await pool.query(
+      `
+      select 
+      a.id as "authorId",
+      a.name as "authorName"
+      from user_roles as ur
+      join users as a on a.id = ur.user_id
+      join roles as r on r.id = ur.role_id
+      where r.id=$1
+      `,
+      [roleId]
+    );
+
+    return authorRes.rows;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = { userInfo, getAllAuthor };
