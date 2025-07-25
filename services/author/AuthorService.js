@@ -348,6 +348,7 @@ async function getAllBooks(authorId) {
     b.id as "bookId",
     b.name as "bookName",
     b.description as "bookDesc",
+    b.created_at as "createdTime",
     u.name as "authorName",
     sc.name as "subCategory"
     from author_book as ab
@@ -360,10 +361,6 @@ async function getAllBooks(authorId) {
     `,
       [authorId]
     );
-
-    if (linkRes.rowCount === 0) {
-      throw new ApiError(500, "Can't find the book data about for author");
-    }
 
     return linkRes.rows;
   } catch (e) {

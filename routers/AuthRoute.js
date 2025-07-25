@@ -4,7 +4,9 @@ const {
   sendOtp,
   verifyOtp,
   changePsw,
+  logOut,
 } = require("../controllers/AuthController");
+const CheckAuth = require("../middlewares/AuthMiddleware");
 const {
   otpCallLimit,
   forgotPasswordLimit,
@@ -24,5 +26,7 @@ route.post("/requestOtp", forgotPasswordLimit, sendOtp);
 route.post("/verifyOtp", otpCallLimit, verifyOtp);
 
 route.post("/changePsw", changePsw);
+
+route.post("/signOut", CheckAuth, logOut);
 
 module.exports = route;

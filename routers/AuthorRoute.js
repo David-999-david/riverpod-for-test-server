@@ -5,6 +5,7 @@ const {
   fetchAllBooks,
 } = require("../controllers/author/AuthorController");
 const CheckAuth = require("../middlewares/AuthMiddleware");
+const { checkPermission } = require("../middlewares/AuthorizationCheck");
 const { otpCallLimit } = require("../middlewares/RateLimit");
 
 const route = require("express").Router();
@@ -15,6 +16,6 @@ route.post("/verifyOtp", CheckAuth, verifyOtp);
 
 route.post("/createBook", CheckAuth, createBook);
 
-route.get("/allBook", CheckAuth, fetchAllBooks);
+route.get("/allBook", CheckAuth, checkPermission("book:read"), fetchAllBooks);
 
 module.exports = route;

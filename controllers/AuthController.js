@@ -5,6 +5,7 @@ const {
   verifyAndSendOtp,
   verifyOtpAndGenerateResetToken,
   changeNewPsw,
+  signOut,
 } = require("../services/AuthService");
 const ApiError = require("../utils/apiError");
 
@@ -129,4 +130,30 @@ async function changePsw(req, res, next) {
   }
 }
 
-module.exports = { createUser, signIn, sendOtp, verifyOtp, changePsw };
+async function logOut(req, res, next) {
+  const userId = req.userId;
+
+  if (!userId) {
+    return next(new ApiError(400, "Headers is missing"));
+  }
+
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return next(new ApiError(400, "Refresh token is missing"));
+  }
+
+  try {
+    const message = await signOut(userId, refreshToken);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: message,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { createUser, signIn, sendOtp, verifyOtp, changePsw, logOut };

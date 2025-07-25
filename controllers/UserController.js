@@ -9,15 +9,12 @@ async function getuserINfo(req, res, next) {
   }
 
   try {
-    const { name, email } = await userInfo(userId);
+    const info = await userInfo(userId);
 
     return res.status(200).json({
       error: false,
       success: true,
-      data: {
-        name,
-        email,
-      },
+      data: info,
     });
   } catch (e) {
     return next(e);

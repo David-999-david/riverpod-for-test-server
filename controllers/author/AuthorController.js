@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const {
   insertBook,
   getAllBooks,
+  checkSecret,
+  verifyAndUpgrade,
 } = require("../../services/author/AuthorService");
 
 async function secretSendOtp(req, res, next) {
@@ -80,7 +82,7 @@ async function createBook(req, res, next) {
 
   if (role !== "author") {
     return next(
-      new ApiError(403, "This user is not get permission about this task")
+      new ApiError(400, "This user is not get permission about this task")
     );
   }
 
@@ -129,10 +131,6 @@ async function fetchAllBooks(req, res, next) {
   }
 
   const userRole = req.userRole;
-
-  if (userRole !== "author") {
-    return next(new ApiError(403, "Current user have no permission"));
-  }
 
   try {
     const books = await getAllBooks(authorId);

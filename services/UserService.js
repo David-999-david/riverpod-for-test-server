@@ -5,8 +5,18 @@ async function userInfo(userId) {
   try {
     const userRes = await pool.query(
       `
-        select name,email from users
-        where id=$1
+        select
+        u.name as name,
+        u.email as email,
+        array_agg(distinct r.name) as role,
+        array_agg(p.name) as permissions
+        from users as u
+        join user_roles as ur on ur.user_id = u.id
+        join roles as r on r.id = ur.role_id
+        join role_permissions as rp on rp.role_id = r.id
+        join permissions as p on p.id = rp.permission_id
+        where u.id =$1
+        group by u.name , u.email
         `,
       [userId]
     );
@@ -15,8 +25,7 @@ async function userInfo(userId) {
       throw new ApiError(404, "User not found");
     }
 
-    const { name, email } = userRes.rows[0];
-    return {name, email};
+    return userRes.rows[0];
   } catch (e) {
     throw new ApiError(e.statusCode, e.message);
   }

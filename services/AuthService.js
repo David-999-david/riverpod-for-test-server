@@ -464,6 +464,26 @@ async function changeNewPsw(resetToken, newPsw) {
   }
 }
 
+async function signOut(userId, refresh) {
+  try {
+    const refreshRes = await pool.query(
+      `
+    delete from user_refresh_token
+    where userid = $1 and refresh_token=$2
+    `,
+      [userId, refresh]
+    );
+
+    if (refreshRes.rowCount === 0) {
+      throw new ApiError(500, "Can't find and delete refresh token for user");
+    }
+
+    return "SignOut success";
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
 module.exports = {
   registerUser,
   login,
@@ -473,4 +493,5 @@ module.exports = {
   changeNewPsw,
   generateAccess,
   generateRefresh,
+  signOut
 };
