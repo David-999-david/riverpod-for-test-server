@@ -1,4 +1,8 @@
-const { userInfo, getAllAuthor } = require("../services/UserService");
+const {
+  userInfo,
+  getAllAuthor,
+  getAllAuthorsBooks,
+} = require("../services/UserService");
 const ApiError = require("../utils/apiError");
 
 async function getuserINfo(req, res, next) {
@@ -41,4 +45,24 @@ async function viewAllAuthor(req, res, next) {
   }
 }
 
-module.exports = { getuserINfo, viewAllAuthor };
+async function fetchAllAuthorsBooks(req, res, next) {
+  const userId = req.userId;
+
+  if (!userId) {
+    return next(new ApiError(400, "Headers is missing"));
+  }
+
+  try {
+    const books = await getAllAuthorsBooks();
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: books,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { getuserINfo, viewAllAuthor, fetchAllAuthorsBooks };

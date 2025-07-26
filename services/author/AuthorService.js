@@ -358,6 +358,7 @@ async function getAllBooks(authorId) {
     join sub_category as sc on sc.id = bs.sub_category_id
     join category as c on c.id = sc.category_id
     where author_id =$1
+    order by b.created_at desc
     `,
       [authorId]
     );

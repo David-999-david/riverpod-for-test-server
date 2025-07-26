@@ -1,4 +1,8 @@
-const { getuserINfo, viewAllAuthor } = require("../controllers/UserController");
+const {
+  getuserINfo,
+  viewAllAuthor,
+  fetchAllAuthorsBooks,
+} = require("../controllers/UserController");
 const CheckAuth = require("../middlewares/AuthMiddleware");
 const { checkPermission } = require("../middlewares/AuthorizationCheck");
 
@@ -11,6 +15,13 @@ route.get(
   CheckAuth,
   checkPermission("book:read"),
   viewAllAuthor
+);
+
+route.get(
+  "/getAllAuthorsBooks",
+  CheckAuth,
+  checkPermission("book:read"),
+  fetchAllAuthorsBooks
 );
 
 module.exports = route;

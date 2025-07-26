@@ -66,4 +66,39 @@ async function getAllAuthor() {
   }
 }
 
-module.exports = { userInfo, getAllAuthor };
+async function getAllAuthorsBooks() {
+  try {
+    const bookRes = await pool.query(
+      `
+      select
+      u.id as "authorId",
+      u.name as "authorName",
+      b.id as "bookId",
+      b.name as "bookName",
+      b.description as "description",
+      b.created_at as "createdAt",
+      sc.id as "subCatId",
+      sc.name as "subCategory",
+      c.id as "categoryId",
+      c.name as "category"
+      from roles as r
+      join user_roles as ur on ur.role_id = r.id
+      join users as u on u.id = ur.user_id
+      join author_book as ab on ab.author_id = u.id
+      join book as b on b.id = ab.book_id
+      join book_sub_category as bs on bs.book_id = ab.book_id
+      join sub_category as sc on sc.id = bs.sub_category_id
+      join category as c on c.id = sc.category_id
+      where r.name = $1
+      order by b.created_at desc
+      `,
+      ["author"]
+    );
+
+    return bookRes.rows;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = { userInfo, getAllAuthor, getAllAuthorsBooks };

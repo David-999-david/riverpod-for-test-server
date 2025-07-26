@@ -14,7 +14,12 @@ route.post("/sendOtp", CheckAuth, otpCallLimit, secretSendOtp);
 
 route.post("/verifyOtp", CheckAuth, verifyOtp);
 
-route.post("/createBook", CheckAuth, createBook);
+route.post(
+  "/createBook",
+  CheckAuth,
+  checkPermission("book:create"),
+  createBook
+);
 
 route.get("/allBook", CheckAuth, checkPermission("book:read"), fetchAllBooks);
 
