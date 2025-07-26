@@ -101,4 +101,49 @@ async function getAllAuthorsBooks() {
   }
 }
 
-module.exports = { userInfo, getAllAuthor, getAllAuthorsBooks };
+async function getBooksByAuthor(authorId) {
+  try {
+    const bookRes = await pool.query(
+      `
+      select 
+      u.id as "authorId",
+      u.name as "authorName",
+      coalesce(
+      json_agg(
+      jsonb_build_object(
+      'bookId', b.id,
+      'bookName' ,b.name,
+      'description',b.description,
+      'createdAt',b.created_at,
+      'subCatId',s.id,
+      'subCategory',s.name,
+      'categoryId',c.id,
+      'category', c.name
+      )
+      order by b.created_at desc
+      ) filter (where b.id is not null), '[]'
+      ) as books
+      from author_book as ab
+      join users as u on u.id = ab.author_id
+      join book as b on b.id = ab.book_id
+      join book_sub_category as bs on bs.book_id = b.id
+      join sub_category as s on s.id = bs.sub_category_id
+      join category as c on c.id = s.category_id
+      where ab.author_id =$1
+      group by u.id, u.name
+      `,
+      [authorId]
+    );
+
+    return bookRes.rows[0];
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = {
+  userInfo,
+  getAllAuthor,
+  getAllAuthorsBooks,
+  getBooksByAuthor,
+};
