@@ -421,4 +421,41 @@ async function getAllBooks(authorId) {
   }
 }
 
-module.exports = { checkSecret, verifyAndUpgrade, insertBook, getAllBooks };
+async function getAllCategoryAndSubCate() {
+  try {
+    const { rows } = await pool.query(
+      `
+      select
+      (
+      select json_agg(
+      jsonb_build_object(
+      'categoryId',id,
+      'category',name
+      )
+      ) from category
+      ) as categories,
+      (
+      select json_agg(
+      jsonb_build_object(
+      'subCateId',id,
+      'catId',category_id,
+      'subCate',name
+      )
+      ) from sub_category
+      ) as subCategories
+      `
+    );
+
+    return rows[0];
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+module.exports = {
+  checkSecret,
+  verifyAndUpgrade,
+  insertBook,
+  getAllBooks,
+  getAllCategoryAndSubCate,
+};

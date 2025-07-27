@@ -3,6 +3,7 @@ const {
   verifyOtp,
   createBook,
   fetchAllBooks,
+  fetchAllCategoryAndSub,
 } = require("../controllers/author/AuthorController");
 const CheckAuth = require("../middlewares/AuthMiddleware");
 const { checkPermission } = require("../middlewares/AuthorizationCheck");
@@ -25,5 +26,12 @@ route.post(
 );
 
 route.get("/allBook", CheckAuth, checkPermission("book:read"), fetchAllBooks);
+
+route.get(
+  "/allCateSubCate",
+  CheckAuth,
+  checkPermission("book:read"),
+  fetchAllCategoryAndSub
+);
 
 module.exports = route;

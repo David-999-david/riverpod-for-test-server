@@ -6,6 +6,8 @@ const {
   getAllBooks,
   checkSecret,
   verifyAndUpgrade,
+  getAllCategory,
+  getAllCategoryAndSubCate,
 } = require("../../services/author/AuthorService");
 
 async function secretSendOtp(req, res, next) {
@@ -150,4 +152,31 @@ async function fetchAllBooks(req, res, next) {
     return next(e);
   }
 }
-module.exports = { secretSendOtp, verifyOtp, createBook, fetchAllBooks };
+
+async function fetchAllCategoryAndSub(req, res, next) {
+  const userId = req.userId;
+
+  if (!userId) {
+    return next(new ApiError(400, "Headers is missing"));
+  }
+
+  try {
+    const allCateAndSubCate = await getAllCategoryAndSubCate();
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: allCateAndSubCate,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = {
+  secretSendOtp,
+  verifyOtp,
+  createBook,
+  fetchAllBooks,
+  fetchAllCategoryAndSub,
+};
