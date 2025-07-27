@@ -4,6 +4,7 @@ const ApiError = require("../../utils/apiError");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const { generateAccess, generateRefresh } = require("../AuthService");
+const supabase = require("../../lib/supabase");
 
 async function checkSecret(secret_key, userId) {
   if (secret_key != authorSecret) {
@@ -217,7 +218,15 @@ async function verifyAndUpgrade(userId, otp) {
   }
 }
 
-async function insertBook(userId, category, subCategory, name, description) {
+async function insertBook(
+  userId,
+  category,
+  subCategory,
+  name,
+  description,
+  fileBuffer,
+  originalName
+) {
   try {
     let categoryRes = await pool.query(
       `
@@ -284,6 +293,40 @@ async function insertBook(userId, category, subCategory, name, description) {
 
     const bookId = bookRes.rows[0].id;
 
+    if (fileBuffer && originalName) {
+      const ext = originalName.split(".").pop();
+      const path = `${bookId}.${ext}`;
+
+      const { error: Uperr } = await supabase.storage
+        .from("books")
+        .upload(path, fileBuffer, {
+          contentType: `image/${ext}`,
+          upsert: true,
+        });
+
+      if (Uperr) throw Uperr;
+
+      const { data, error: UrlErr } = await supabase.storage
+        .from("books")
+        .getPublicUrl(path);
+      if (UrlErr) throw UrlErr;
+
+      const publicUrl = data.publicUrl;
+
+      const imageRes = await pool.query(
+        `
+      update book
+      set image_url = $1
+      where id = $2
+      `,
+        [publicUrl, bookId]
+      );
+
+      if (imageRes.rowCount === 0) {
+        throw new ApiError(400, "Failed to added image for book");
+      }
+    }
+
     const bookSubLink = await pool.query(
       `insert into book_sub_category
       (book_id,sub_category_id)
@@ -317,7 +360,15 @@ async function insertBook(userId, category, subCategory, name, description) {
       );
     }
 
-    const book = bookRes.rows[0];
+    const ResultRes = await pool.query(
+      `select id,name,description,image_url
+      from book
+      where id =$1
+      `,
+      [bookId]
+    );
+
+    const book = ResultRes.rows[0];
 
     const userRes = await pool.query(
       `
@@ -349,6 +400,7 @@ async function getAllBooks(authorId) {
     b.name as "bookName",
     b.description as "bookDesc",
     b.created_at as "createdTime",
+    b.image_url as "imageUrl",
     u.name as "authorName",
     sc.name as "subCategory"
     from author_book as ab

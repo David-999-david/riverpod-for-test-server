@@ -104,13 +104,19 @@ async function createBook(req, res, next) {
     return next(new ApiError(400, "Book description is missing"));
   }
 
+  const fileBuffer = req.file ? req.file.buffer : null;
+
+  const originalName = req.file ? req.file.originalname : null;
+
   try {
     const { categoryName, subCateName, authorName, book } = await insertBook(
       userId,
       category,
       subCategory,
       name,
-      description
+      description,
+      fileBuffer,
+      originalName
     );
 
     return res.status(201).json({

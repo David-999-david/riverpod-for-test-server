@@ -7,6 +7,8 @@ const {
 const CheckAuth = require("../middlewares/AuthMiddleware");
 const { checkPermission } = require("../middlewares/AuthorizationCheck");
 const { otpCallLimit } = require("../middlewares/RateLimit");
+const multer = require("multer");
+const upload = multer();
 
 const route = require("express").Router();
 
@@ -18,6 +20,7 @@ route.post(
   "/createBook",
   CheckAuth,
   checkPermission("book:create"),
+  upload.single("image"),
   createBook
 );
 

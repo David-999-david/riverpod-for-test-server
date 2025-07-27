@@ -76,6 +76,7 @@ async function getAllAuthorsBooks() {
       b.id as "bookId",
       b.name as "bookName",
       b.description as "description",
+      b.image_url as "imageUrl",
       b.created_at as "createdAt",
       sc.id as "subCatId",
       sc.name as "subCategory",
@@ -113,6 +114,7 @@ async function getBooksByAuthor(authorId) {
       jsonb_build_object(
       'bookId', b.id,
       'bookName' ,b.name,
+      'imageUrl', b.image_url,
       'description',b.description,
       'createdAt',b.created_at,
       'subCatId',s.id,
