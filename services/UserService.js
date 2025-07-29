@@ -78,8 +78,15 @@ async function getAllAuthorsBooks() {
       b.description as "description",
       b.image_url as "imageUrl",
       b.created_at as "createdAt",
-      sc.id as "subCatId",
-      sc.name as "subCategory",
+      coalesce(
+      json_agg(
+      jsonb_build_object(
+      'subCatId',sc.id,
+      'subCategory',sc.name
+      )
+      ) filter (where sc.id is not null),
+       '[]'
+      ) as "subCategories",
       c.id as "categoryId",
       c.name as "category"
       from roles as r
@@ -89,8 +96,11 @@ async function getAllAuthorsBooks() {
       join book as b on b.id = ab.book_id
       join book_sub_category as bs on bs.book_id = ab.book_id
       join sub_category as sc on sc.id = bs.sub_category_id
-      join category as c on c.id = sc.category_id
+      join cat_sub_cat as cs on cs.sub_category_id = sc.id
+      join category as c on c.id = cs.category_id
       where r.name = $1
+      group by u.id, u.name, b.id, b.name,b.description,b.image_url,
+      b.created_at,c.id,c.name
       order by b.created_at desc
       `,
       ["author"]
@@ -106,33 +116,81 @@ async function getBooksByAuthor(authorId) {
   try {
     const bookRes = await pool.query(
       `
-      select 
+      select
       u.id as "authorId",
       u.name as "authorName",
+
       coalesce(
-      json_agg(
-      jsonb_build_object(
-      'bookId', b.id,
-      'bookName' ,b.name,
-      'imageUrl', b.image_url,
-      'description',b.description,
-      'createdAt',b.created_at,
-      'subCatId',s.id,
-      'subCategory',s.name,
-      'categoryId',c.id,
-      'category', c.name
+      jsonb_agg(
+      book_obj 
+      order by book_obj ->> 'createdAt' desc
+      ) FILTER (where book_obj ->> 'bookId' is not null),
+      '[]'
+      ) as "books"
+
+      from users as u
+      left join author_book as ab on ab.author_id = u.id
+      left join book as b on b.id = ab.book_id
+      
+      left join LATERAL(
+      select jsonb_build_object(
+
+      'categoryId', 
+      (
+      select c.id
+      from cat_sub_cat as cs
+      join category as c on c.id = cs.category_id
+      where cs.sub_category_id in (
+      select sub_category_id
+      from book_sub_category
+      where book_id = b.id
       )
-      order by b.created_at desc
-      ) filter (where b.id is not null), '[]'
-      ) as books
-      from author_book as ab
-      join users as u on u.id = ab.author_id
-      join book as b on b.id = ab.book_id
-      join book_sub_category as bs on bs.book_id = b.id
-      join sub_category as s on s.id = bs.sub_category_id
-      join category as c on c.id = s.category_id
-      where ab.author_id =$1
-      group by u.id, u.name
+      limit 1
+      ),
+
+      'category', 
+      (
+      select c.name
+      from cat_sub_cat as cs
+      join category as c on c.id = cs.category_id
+      where cs.sub_category_id in (
+      select sub_category_id
+      from book_sub_category
+      where book_id=b.id
+      )
+      limit 1
+      ),
+
+
+      'bookId', b.id,
+      'bookName', b.name,
+      'description', b.description,
+      'imageUrl', b.image_url,
+      'createdAt', b.created_at,
+
+      'subCategories',
+      coalesce(
+      (
+      select jsonb_agg(
+      jsonb_build_object(
+      'subCatId',sc2.id,
+      'subCategory',sc2.name
+      )
+      order by sc2.name
+      )
+      from book_sub_category as bs2
+      join sub_category as sc2 on sc2.id = bs2.sub_category_id
+      where bs2.book_id=b.id
+
+      ),
+      '[]'
+      )
+
+      ) as book_obj
+      ) as sub_book ON TRUE
+
+      where u.id = $1
+      group by u.id,u.name
       `,
       [authorId]
     );

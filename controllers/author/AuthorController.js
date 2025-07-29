@@ -72,14 +72,6 @@ async function createBook(req, res, next) {
     return next(400, "Header is missing");
   }
 
-  // const permission = req.userPrems;
-
-  // if (!permission.includes("book:create")) {
-  //   return next(
-  //     new ApiError(403, "This user is not get permission about this task")
-  //   );
-  // }
-
   const role = req.userRole;
 
   if (role !== "author") {
@@ -88,13 +80,13 @@ async function createBook(req, res, next) {
     );
   }
 
-  const { category, subCategory, name, description } = req.body;
+  const { category, subCategories, name, description } = req.body;
 
   if (!category) {
     return next(new ApiError(400, "Category is missing"));
   }
 
-  if (!subCategory) {
+  if (!subCategories) {
     return next(new ApiError(400, "Sub-category is missing"));
   }
 
@@ -110,11 +102,16 @@ async function createBook(req, res, next) {
 
   const originalName = req.file ? req.file.originalname : null;
 
+  const subNames =
+    typeof req.body.subCategories === "string"
+      ? JSON.parse(req.body.subCategories)
+      : req.body.subCategories;
+
   try {
-    const { categoryName, subCateName, authorName, book } = await insertBook(
+    const { categoryName, subCateNames, authorName, book } = await insertBook(
       userId,
       category,
-      subCategory,
+      subNames,
       name,
       description,
       fileBuffer,
@@ -124,7 +121,7 @@ async function createBook(req, res, next) {
     return res.status(201).json({
       error: false,
       success: true,
-      data: { categoryName, subCateName, authorName, book },
+      data: { categoryName, subCateNames, authorName, book },
     });
   } catch (e) {
     return next(e);

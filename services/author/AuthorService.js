@@ -221,7 +221,7 @@ async function verifyAndUpgrade(userId, otp) {
 async function insertBook(
   userId,
   category,
-  subCategory,
+  subCategories,
   name,
   description,
   fileBuffer,
@@ -252,29 +252,48 @@ async function insertBook(
 
     const { id: categoryId, name: categoryName } = categoryRes.rows[0];
 
-    let subCateRes = await pool.query(
+    const { rows } = await pool.query(
       `
+      With ins as(
       insert into sub_category
-      (name,category_id)
-      values
-      ($1,$2)
-      on conflict (name,category_id) do nothing
-      returning *
+      (name)
+      select unnest ($1::Text[])
+      on conflict (name) do nothing
+      returning id,name
+      )
+      select id,name 
+      from ins
+      union
+      select id,name
+      from sub_category
+      where name=any($1::Text[])
       `,
-      [subCategory, categoryId]
+      [subCategories]
     );
 
-    if (subCateRes.rowCount === 0) {
-      subCateRes = await pool.query(
-        `
-        select id,name from sub_category
-        where name =$1 and category_id=$2
-        `,
-        [subCategory, categoryId]
-      );
-    }
+    const subCatIds = rows.map((r) => r.id);
 
-    const { id: subCateId, name: subCateName } = subCateRes.rows[0];
+    const subCateNames = rows.map((r) => r.name);
+
+    const linkPh = subCatIds
+      .map((_, idx) => {
+        return `($${1},$${idx + 2})`;
+      })
+      .join(", ");
+
+    const linkRes = await pool.query(
+      `
+      insert into cat_sub_cat
+      (category_id,sub_category_id)
+      values ${linkPh}
+      on conflict do nothing
+      `,
+      [categoryId, ...subCatIds]
+    );
+
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(500, "Link for category with subcategories failed");
+    }
 
     const bookRes = await pool.query(
       `
@@ -327,13 +346,19 @@ async function insertBook(
       }
     }
 
+    const bookSubLinkPh = subCatIds
+      .map((_, idx) => {
+        return `($${1},$${idx + 2})`;
+      })
+      .join(", ");
+
     const bookSubLink = await pool.query(
       `insert into book_sub_category
       (book_id,sub_category_id)
       values
-      ($1,$2)
+      ${bookSubLinkPh}
       `,
-      [bookId, subCateId]
+      [bookId, ...subCatIds]
     );
 
     if (bookSubLink.rowCount === 0) {
@@ -384,7 +409,7 @@ async function insertBook(
 
     const { name: authorName } = userRes.rows[0];
 
-    return { categoryName, subCateName, authorName, book };
+    return { categoryName, subCateNames, authorName, book };
   } catch (e) {
     throw new ApiError(e.statusCode, e.message);
   }
@@ -402,14 +427,17 @@ async function getAllBooks(authorId) {
     b.created_at as "createdTime",
     b.image_url as "imageUrl",
     u.name as "authorName",
-    sc.name as "subCategory"
+    array_agg(distinct sc.name) as "subCategories"
     from author_book as ab
     join users as u on u.id = ab.author_id
     join book as b on b.id = ab.book_id
     join book_sub_category as bs on bs.book_id = b.id
     join sub_category as sc on sc.id = bs.sub_category_id
-    join category as c on c.id = sc.category_id
+    join cat_sub_cat as cs on cs.sub_category_id = sc.id
+    join category as c on c.id = cs.category_id
     where author_id =$1
+    group by c.name,
+    b.id,b.name,b.description,b.created_at,b.image_url,u.name
     order by b.created_at desc
     `,
       [authorId]
