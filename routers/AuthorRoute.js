@@ -4,6 +4,7 @@ const {
   createBook,
   fetchAllBooks,
   fetchAllCategoryAndSub,
+  createNewChapter,
 } = require("../controllers/author/AuthorController");
 const CheckAuth = require("../middlewares/AuthMiddleware");
 const { checkPermission } = require("../middlewares/AuthorizationCheck");
@@ -32,6 +33,13 @@ route.get(
   CheckAuth,
   checkPermission("book:read"),
   fetchAllCategoryAndSub
+);
+
+route.post(
+  "/books/:bookId/createNewChapter",
+  CheckAuth,
+  checkPermission("book:create"),
+  createNewChapter
 );
 
 module.exports = route;

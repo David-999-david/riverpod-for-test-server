@@ -532,10 +532,34 @@ async function getAllCategoryAndSubCate() {
   }
 }
 
+async function insertNewChapter(authorId, bookId, chapter, title, content) {
+  try {
+    const chapterRes = await pool.query(
+      `
+      insert into chapters
+      (author_id,book_id,chapter,title,content)
+      values
+      ($1,$2,$3,$4,$5)
+      returning *
+      `,
+      [authorId, bookId, chapter, title, content]
+    );
+
+    if (chapterRes.rowCount === 0) {
+      return new ApiError(500, `Create new chapter for ${bookId} Failed`);
+    }
+
+    return chapterRes.rows[0];
+  } catch (e) {
+    return new ApiError(e.statusCode, e.message);
+  }
+}
+
 module.exports = {
   checkSecret,
   verifyAndUpgrade,
   insertBook,
   getAllBooks,
   getAllCategoryAndSubCate,
+  insertNewChapter,
 };

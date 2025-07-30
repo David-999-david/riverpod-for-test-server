@@ -8,6 +8,7 @@ const {
   verifyAndUpgrade,
   getAllCategory,
   getAllCategoryAndSubCate,
+  insertNewChapter,
 } = require("../../services/author/AuthorService");
 
 async function secretSendOtp(req, res, next) {
@@ -174,10 +175,58 @@ async function fetchAllCategoryAndSub(req, res, next) {
   }
 }
 
+async function createNewChapter(req, res, next) {
+  const authorId = req.userId;
+
+  if (!authorId) {
+    return next(new ApiError(400, "Invalid user"));
+  }
+
+  const bookId = req.params.bookId;
+
+  if (!bookId) {
+    return next(new ApiError(400, "BookId for creating new capter is missing"));
+  }
+
+  const { chapter, title, content } = req.body;
+
+  if (!chapter) {
+    return next(new ApiError(400, "Chapter is missing"));
+  }
+
+  if (!title) {
+    return next(new ApiError(400, "Title is missing"));
+  }
+
+  if (!content) {
+    return next(new ApiError(400, "Content is missing"));
+  }
+
+  try {
+    const chapterRes = await insertNewChapter(
+      authorId,
+      bookId,
+      chapter,
+      title,
+      content
+    );
+
+    return res.status(201).json({
+      error: false,
+      success: true,
+      data: chapterRes,
+      message: `Create new chapter is success`,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
   secretSendOtp,
   verifyOtp,
   createBook,
   fetchAllBooks,
   fetchAllCategoryAndSub,
+  createNewChapter,
 };
