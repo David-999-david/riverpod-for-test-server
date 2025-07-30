@@ -66,7 +66,7 @@ async function getAllAuthor() {
   }
 }
 
-async function getAllAuthorsBooks() {
+async function getAllAuthorsBooks(page, limit, offset) {
   try {
     const bookRes = await pool.query(
       `
@@ -102,11 +102,31 @@ async function getAllAuthorsBooks() {
       group by u.id, u.name, b.id, b.name,b.description,b.image_url,
       b.created_at,c.id,c.name
       order by b.created_at desc
+      limit $2 offset $3
+      `,
+      ["author", limit, offset]
+    );
+
+    const books = bookRes.rows;
+
+    const countRes = await pool.query(
+      `
+      select count (distinct b.id) as total
+      from roles as r
+      join user_roles as ur on ur.role_id = r.id
+      join users as u on u.id = ur.user_id
+      join author_book as ab on ab.author_id = u.id
+      join book as b on b.id = ab.book_id
+      where r.name = $1
       `,
       ["author"]
     );
 
-    return bookRes.rows;
+    const totalCounts = parseInt(countRes.rows[0].total, 10);
+
+    const totalPage = Math.ceil(totalCounts / limit);
+
+    return { books, totalCounts, totalPage };
   } catch (e) {
     throw new ApiError(e.statusCode, e.message);
   }

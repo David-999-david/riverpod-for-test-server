@@ -415,35 +415,87 @@ async function insertBook(
   }
 }
 
-async function getAllBooks(authorId) {
+async function getAllBooks(authorId, limit, offset) {
   try {
+    // const linkRes = await pool.query(
+    //   `
+    // select
+    // c.name as "category",
+    // b.id as "bookId",
+    // b.name as "bookName",
+    // b.description as "bookDesc",
+    // b.created_at as "createdTime",
+    // b.image_url as "imageUrl",
+    // u.name as "authorName",
+    // array_agg(distinct sc.name) as "subCategories"
+    // from author_book as ab
+    // join users as u on u.id = ab.author_id
+    // join book as b on b.id = ab.book_id
+    // join book_sub_category as bs on bs.book_id = b.id
+    // join sub_category as sc on sc.id = bs.sub_category_id
+    // join cat_sub_cat as cs on cs.sub_category_id = sc.id
+    // join category as c on c.id = cs.category_id
+    // where author_id =$1
+    // group by c.name,
+    // b.id,b.name,b.description,b.created_at,b.image_url,u.name
+    // order by b.created_at desc
+    // limit $2 offset $3
+    // `
+    // ,
+    //   [authorId, limit, offset]
+    // );
+
     const linkRes = await pool.query(
       `
-    select
-    c.name as "category",
-    b.id as "bookId",
-    b.name as "bookName",
-    b.description as "bookDesc",
-    b.created_at as "createdTime",
-    b.image_url as "imageUrl",
-    u.name as "authorName",
-    array_agg(distinct sc.name) as "subCategories"
-    from author_book as ab
-    join users as u on u.id = ab.author_id
-    join book as b on b.id = ab.book_id
-    join book_sub_category as bs on bs.book_id = b.id
-    join sub_category as sc on sc.id = bs.sub_category_id
-    join cat_sub_cat as cs on cs.sub_category_id = sc.id
-    join category as c on c.id = cs.category_id
-    where author_id =$1
-    group by c.name,
-    b.id,b.name,b.description,b.created_at,b.image_url,u.name
-    order by b.created_at desc
-    `,
+      select
+      u.name as "authorName",
+      c.id as "categoryId",
+      c.name as "category",
+      b.id as "bookId",
+      b.name as "bookName",
+      b.description as "description",
+      b.image_url as "imageUrl",
+      b.created_at as "createdAt",
+      b.updated_at as "updatedAt",
+      coalesce(
+      jsonb_agg(
+      jsonb_build_object(
+      'subCatId', sc.id,
+      'subCategory',sc.name
+      )
+      ) filter (where sc.id is not null), '[]'
+      ) as "subCategories"
+      from author_book as ab
+      join users as u on u.id = ab.author_id
+      join book as b on b.id = ab.book_id
+      join book_sub_category as bs on bs.book_id = b.id
+      join sub_category as sc on sc.id = bs.sub_category_id
+      join cat_sub_cat as csc on csc.sub_category_id = sc.id
+      join category as c on c.id = csc.category_id
+      where ab.author_id=$1
+      group by u.name,c.id,c.name,b.id,b.name,b.description,b.image_url,
+      b.created_at,b.updated_at
+      limit $2 offset $3
+      `,
+      [authorId, limit, offset]
+    );
+
+    const CountRes = await pool.query(
+      `
+      select count (distinct b.id) as total
+      from users as u
+      join author_book as ab on ab.author_id = u.id
+      join book as b on b.id = ab.book_id
+      where u.id=$1
+      `,
       [authorId]
     );
 
-    return linkRes.rows;
+    const link = linkRes.rows;
+
+    const totalCounts = parseInt(CountRes.rows[0].total, 10);
+
+    return { link, totalCounts };
   } catch (e) {
     throw new ApiError(e.statusCode, e.message);
   }

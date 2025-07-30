@@ -135,15 +135,19 @@ async function fetchAllBooks(req, res, next) {
     return next(new ApiError(400, "Header is missing"));
   }
 
-  const userRole = req.userRole;
+  const limit = Math.min(parseInt(req.query.limit), 100);
+  const page = Math.max(parseInt(req.query.page), 1);
+
+  const offset = (page - 1) * limit;
 
   try {
-    const books = await getAllBooks(authorId);
+    const { link, totalCounts } = await getAllBooks(authorId, limit, offset);
 
     return res.status(200).json({
       error: false,
       success: true,
-      data: books,
+      data: link,
+      totalCounts,
     });
   } catch (e) {
     return next(e);
