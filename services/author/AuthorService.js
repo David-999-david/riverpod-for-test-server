@@ -555,6 +555,87 @@ async function insertNewChapter(authorId, bookId, chapter, title, content) {
   }
 }
 
+async function getAllChapter(authorId, bookId) {
+  try {
+    console.log(`bookId => ${bookId}, userId => ${authorId}`);
+
+    const linkRes = await pool.query(
+      `
+      select * from author_book
+      where author_id =$1 and book_id=$2
+      `,
+      [authorId, bookId]
+    );
+
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(500, "This user is not the owner of book");
+    }
+
+    const { rows: chapters } = await pool.query(
+      `
+      select * from chapters
+      where author_id =$1 and book_id=$2
+      order by chapter desc
+      `,
+      [authorId, bookId]
+    );
+
+    console.log(`All Chapters : ${chapters}`);
+
+    return chapters;
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
+async function updateImage(authorId, bookId, fileBuffer, originalName) {
+  try {
+    const linkRes = await pool.query(
+      `
+      select 1 from author_book
+      where author_id=$1 and book_id=$2
+      `,
+      [authorId, bookId]
+    );
+
+    if (linkRes.rowCount === 0) {
+      throw new ApiError(500, "This author have no permission for this book");
+    }
+
+    const ext = originalName.split(".").pop();
+    const path = `${bookId}.${ext}`;
+
+    const { error: UpErr } = await supabase.storage
+      .from("books")
+      .upload(path, fileBuffer, { contentType: `image/${ext}`, upsert: true });
+
+    if (UpErr) throw UpErr;
+
+    const { data, error: UrlErr } = await supabase.storage
+      .from("books")
+      .getPublicUrl(path);
+
+    if (UrlErr) throw UrlErr;
+
+    const publicUrl = data.publicUrl;
+
+    const imageRes = await pool.query(
+      `
+      update book
+      set image_url =$1
+      where id=$2
+      `,
+      [publicUrl, bookId]
+    );
+
+    if (imageRes.rowCount === 0) {
+      throw new ApiError(500, `Failed to update the image of bookId=${bookId}`);
+    }
+  } catch (e) {
+    throw new ApiError(e.statusCode, e.message);
+  }
+}
+
 module.exports = {
   checkSecret,
   verifyAndUpgrade,
@@ -562,4 +643,6 @@ module.exports = {
   getAllBooks,
   getAllCategoryAndSubCate,
   insertNewChapter,
+  getAllChapter,
+  updateImage,
 };

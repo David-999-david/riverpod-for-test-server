@@ -9,6 +9,8 @@ const {
   getAllCategory,
   getAllCategoryAndSubCate,
   insertNewChapter,
+  getAllChapter,
+  updateImage,
 } = require("../../services/author/AuthorService");
 
 async function secretSendOtp(req, res, next) {
@@ -222,6 +224,64 @@ async function createNewChapter(req, res, next) {
   }
 }
 
+async function fetchAllChapters(req, res, next) {
+  const authorId = req.userId;
+
+  if (!authorId) {
+    return next(new ApiError(400, "Invalid user"));
+  }
+
+  const bookId = req.params.bookId;
+
+  if (!bookId) {
+    return next(new ApiError(400, "BookId is missing"));
+  }
+
+  try {
+    const chapters = await getAllChapter(authorId, bookId);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: chapters,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+async function editBookImage(req, res, next) {
+  const authorId = req.userId;
+
+  if (!authorId) {
+    return next(new ApiError(400, "Invalid user"));
+  }
+
+  const bookId = req.params.bookId;
+
+  if (!bookId) {
+    return next(new ApiError(400, "Book id is missing"));
+  }
+
+  const fileBuffer = req.file.buffer;
+  const originalName = req.file.originalname;
+
+  if (!fileBuffer || !originalName) {
+    return next(new ApiError(400, "File buffer and name is missing"));
+  }
+
+  try {
+    await updateImage(authorId, bookId, fileBuffer, originalName);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      msg: "Book image changes success",
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
   secretSendOtp,
   verifyOtp,
@@ -229,4 +289,6 @@ module.exports = {
   fetchAllBooks,
   fetchAllCategoryAndSub,
   createNewChapter,
+  fetchAllChapters,
+  editBookImage,
 };
